@@ -11,13 +11,9 @@ public class AlterPrint {
         @Override
         public void run() {
             for (int i=1;i<=26;i++) {
-                for (;;) {
-                    if (flag) {
-                        System.out.println(i);
-                        flag = !flag;
-                        break;
-                    }
-                }
+                while (flag) {}
+                System.out.println(i);
+                flag = !flag;
             }
         }
     }
@@ -25,14 +21,9 @@ public class AlterPrint {
         @Override
         public void run() {
             for (int i=0;i<26;i++) {
-                for (;;) {
-                    if (!flag) {
-                        // or 97
-                        System.out.println((char)(65+i));
-                        flag = !flag;
-                        break;
-                    }
-                }
+                while (!flag) {}
+                System.out.println((char)(65+i));
+                flag = !flag;
             }
         }
     }
