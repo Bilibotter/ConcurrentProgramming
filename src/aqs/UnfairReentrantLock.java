@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * @Author: YHM
@@ -84,7 +85,7 @@ public class UnfairReentrantLock implements Lock {
         Condition newCondition() {return new ConditionObject();}
     }
 
-    private static class Test extends Thread {
+    public static class Test extends Thread {
         private final Lock lock;
         public Test(Lock lock) {
             super();

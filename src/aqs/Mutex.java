@@ -76,7 +76,7 @@ public class Mutex implements Lock {
         return sync.tryAcquireNanos(1, unit.toNanos(time));
     }
 
-    private static class Test extends Thread {
+    public static class Test extends Thread {
         private final Lock lock;
         public Test(Lock lock) {
             super();
