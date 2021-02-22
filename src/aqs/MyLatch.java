@@ -61,7 +61,7 @@ public class MyLatch {
             }
         }
     }
-    public static final int COUNT = 100;
+    private static final int COUNT = 100;
     private static final MyLatch latch = new MyLatch(COUNT);
     private static class Dec implements Runnable {
         @Override
