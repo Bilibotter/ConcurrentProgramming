@@ -9,7 +9,7 @@ import java.util.concurrent.TimeUnit;
  * @Author: YHM
  * @Date: 2021/2/23 18:55
  */
-public class TestPurifyReadWriteLock {
+public class TestDowngradeReadWriteLock {
     private final static DowngradeReadWriteLock lock = new DowngradeReadWriteLock();
 
     private final static DowngradeReadWriteLock.ReadLock read = lock.readerLock();
