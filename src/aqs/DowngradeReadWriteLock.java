@@ -124,6 +124,22 @@ public class DowngradeReadWriteLock {
         }
     }
 
+    /*
+    // JDK的apparentlyFirstQueuedIsExclusive()不公开
+    static final class UnfairSync extends Sync {
+        @Override
+        boolean readerShouldBlock() {
+            return apparentlyFirstQueuedIsExclusive();
+        }
+
+        @Override
+        boolean writerShouldBlock() {
+            return false;
+        }
+    }
+
+     */
+
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 对写锁容量降级以获取更好的性能
         // 同时写锁降级后会程序出错的地方更快触发
