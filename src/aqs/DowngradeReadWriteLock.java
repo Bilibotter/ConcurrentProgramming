@@ -81,19 +81,6 @@ public class DowngradeReadWriteLock {
             sync = lock.sync;
         }
 
-        /*
-        // for test
-        public int getCount() {
-            return sync.readCount.get();
-        }
-
-        // for test
-        public int getTotal() {
-            return sync.getStatus();
-        }
-
-         */
-
         @Override
         public void lock() {
             sync.acquireShared(1);
