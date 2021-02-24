@@ -11,6 +11,7 @@ import java.util.concurrent.locks.Lock;
  */
 public class Mutex implements Lock {
     private static class Sync extends AbstractQueuedSynchronizer {
+
         @Override
         protected boolean isHeldExclusively() {
             return getState() == 1;
@@ -33,7 +34,9 @@ public class Mutex implements Lock {
             return true;
         }
 
-        Condition newCondition() {return new ConditionObject();}
+        Condition newCondition() {
+            return new ConditionObject();
+        }
     }
 
     private final Sync sync = new Sync();
