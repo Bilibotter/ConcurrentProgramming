@@ -81,7 +81,7 @@ public class MyLatch {
                 new ThreadPoolExecutor(nThreads, nThreads*2, 0L,
                         TimeUnit.MILLISECONDS, new LinkedBlockingDeque<>(nThreads * 10), Executors.defaultThreadFactory(), new ThreadPoolExecutor.DiscardPolicy());
         /*
-        这种写法不有趣
+        这种写法有点无聊
         for (int i=0;i<COUNT;i++) {
             exec.execute(new Dec());
         }
