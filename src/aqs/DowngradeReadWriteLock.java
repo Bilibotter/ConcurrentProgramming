@@ -1,5 +1,7 @@
 package aqs;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.AbstractQueuedSynchronizer;
 import java.util.concurrent.locks.Condition;
@@ -15,7 +17,11 @@ public class DowngradeReadWriteLock {
     private final ReadLock readerLock;
 
     public DowngradeReadWriteLock() {
-        sync = new FairSync();
+        this(false);
+    }
+
+    public DowngradeReadWriteLock(boolean fair) {
+        sync = fair ? new FairSync() : new UnfairSync();
         writerLock = new WriteLock(this);
         readerLock = new ReadLock(this);
     }
@@ -124,12 +130,22 @@ public class DowngradeReadWriteLock {
         }
     }
 
-    /*
-    // JDK的apparentlyFirstQueuedIsExclusive()不公开
     static final class UnfairSync extends Sync {
+        protected Method apparentlyFirstQueuedIsExclusive;
+        UnfairSync() {
+            super();
+            try {
+                Class<?> aqs = Class.forName(AbstractQueuedSynchronizer.class.getName());
+                apparentlyFirstQueuedIsExclusive = aqs.getDeclaredMethod("apparentlyFirstQueuedIsExclusive");
+                apparentlyFirstQueuedIsExclusive.setAccessible(true);
+            } catch (ClassNotFoundException | NoSuchMethodException ignore){}
+        }
         @Override
         boolean readerShouldBlock() {
-            return apparentlyFirstQueuedIsExclusive();
+            try {
+                return (boolean) apparentlyFirstQueuedIsExclusive.invoke(this);
+            } catch (IllegalAccessException| InvocationTargetException ignore) {}
+            return false;
         }
 
         @Override
@@ -137,8 +153,6 @@ public class DowngradeReadWriteLock {
             return false;
         }
     }
-
-     */
 
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 对写锁容量降级以获取更好的性能
@@ -163,6 +177,15 @@ public class DowngradeReadWriteLock {
                     return 0;
                 }
             };
+            // apparentlyFirstQueuedIsExclusive不可见，通过反射调用
+            /*
+            try {
+                Class<?> aqs = Class.forName(AbstractQueuedSynchronizer.class.getName());
+                apparentlyFirstQueuedIsExclusive = aqs.getDeclaredMethod("apparentlyFirstQueuedIsExclusive");
+                apparentlyFirstQueuedIsExclusive.setAccessible(true);
+            } catch (ClassNotFoundException | NoSuchMethodException ignore){}
+
+             */
         }
 
         int getExclusive(int c) {
@@ -171,14 +194,6 @@ public class DowngradeReadWriteLock {
 
         int getShared(int c) {
             return c >> SHIFT;
-        }
-
-        protected boolean fairReadBlock() {
-            return hasQueuedPredecessors();
-        }
-
-        protected boolean unfairWriteBlock() {
-            return hasQueuedPredecessors();
         }
 
         abstract boolean readerShouldBlock();
