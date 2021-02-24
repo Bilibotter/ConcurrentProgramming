@@ -259,7 +259,7 @@ public class DowngradeReadWriteLock {
             }
             // 公平锁：前驱节点不是首节点
             // 非公平锁:独占节点的前驱节点为首节点
-            int c;
+            int c, nextc;
             for (;;) {
                 c = getState();
                 if (getExclusive(c) > 0) {
@@ -268,14 +268,13 @@ public class DowngradeReadWriteLock {
                 if (readerShouldBlock()) {
                     return -1;
                 }
-                // 读锁上限貌似-1
-                // 但可以少做退位运算
-                if (compareAndSetState(c, c +READ_UNIT)) {
+                nextc = c + READ_UNIT;
+                if (getShared(getState()) >= READ_MAX) {
+                    throw new Error("Maximum lock count exceeded");
+                }
+                if (compareAndSetState(c, nextc)) {
                     Integer lockNum = readCount.get();
                     readCount.set(lockNum + 1);
-                    if (getShared(getState()) >= READ_MAX) {
-                        throw new Error("Maximum lock count exceeded");
-                    }
                     return 1;
                 }
             }
