@@ -192,12 +192,6 @@ public class DowngradeReadWriteLock {
 
         abstract boolean writerShouldBlock();
 
-        protected void checkReadNum() {
-            if (getShared(getState()) >= READ_UNIT) {
-                throw new Error("Maximum lock count exceeded");
-            }
-        }
-
         protected int getWriteHoldCount() {
             return isHeldExclusively()? 0: getExclusive(getState());
         }
@@ -219,7 +213,7 @@ public class DowngradeReadWriteLock {
             // 或state == 0
             if (isHeldExclusively()) {
                 int update = getExclusive(c) + 1;
-                if (update > WRITE_MASK) {
+                if (update > WRITE_MAX) {
                     throw new Error("Maximum lock count exceeded");
                 }
                 setState(update);
