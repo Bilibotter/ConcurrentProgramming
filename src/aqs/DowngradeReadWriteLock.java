@@ -134,6 +134,7 @@ public class DowngradeReadWriteLock {
         protected Method apparentlyFirstQueuedIsExclusive;
         UnfairSync() {
             super();
+            // apparentlyFirstQueuedIsExclusive不可访问，通过反射调用
             try {
                 Class<?> aqs = Class.forName(AbstractQueuedSynchronizer.class.getName());
                 apparentlyFirstQueuedIsExclusive = aqs.getDeclaredMethod("apparentlyFirstQueuedIsExclusive");
@@ -177,15 +178,6 @@ public class DowngradeReadWriteLock {
                     return 0;
                 }
             };
-            // apparentlyFirstQueuedIsExclusive不可见，通过反射调用
-            /*
-            try {
-                Class<?> aqs = Class.forName(AbstractQueuedSynchronizer.class.getName());
-                apparentlyFirstQueuedIsExclusive = aqs.getDeclaredMethod("apparentlyFirstQueuedIsExclusive");
-                apparentlyFirstQueuedIsExclusive.setAccessible(true);
-            } catch (ClassNotFoundException | NoSuchMethodException ignore){}
-
-             */
         }
 
         int getExclusive(int c) {
@@ -311,13 +303,6 @@ public class DowngradeReadWriteLock {
             }
             return lockNum;
         }
-
-        /*
-        public int getStatus() {
-            return getState();
-        }
-
-         */
 
         @Override
         protected boolean tryReleaseShared(int arg) {
