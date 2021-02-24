@@ -34,9 +34,20 @@ public class SimpleUnfairSemaphore {
         unfairSync.releaseShared(1);
     }
 
+    private static class HoldCount extends ThreadLocal<Integer> {
+        @Override
+        protected Integer initialValue() {
+            return 0;
+        }
+    }
+
     private class UnfairSync extends AbstractQueuedSynchronizer {
+
+        private HoldCount holdCount;
+
         public UnfairSync(int permit) {
             setState(permit);
+            holdCount = new HoldCount();
         }
 
         // 还有许可就一直尝试, 直到没有许可
@@ -45,7 +56,11 @@ public class SimpleUnfairSemaphore {
             for (;;) {
                 int avail = getState();
                 int remain = avail - arg;
-                if (remain < 0 || compareAndSetState(avail, remain)) {
+                if (remain < 0) {
+                    return remain;
+                }
+                if (compareAndSetState(avail, remain)) {
+                    holdCount.set(holdCount.get() + 1);
                     return remain;
                 }
             }
@@ -54,13 +69,19 @@ public class SimpleUnfairSemaphore {
         // 源码未修改同步状态的线程也能释放，感觉不安全
         @Override
         protected boolean tryReleaseShared(int arg) {
-            if (arg < 0) {
-                throw new Error("Maximum permit count exceeded");
+            int count = holdCount.get();
+            if (count == 0) {
+                throw new Error("Not locked by current thread");
             }
             for (;;) {
                 int curr = getState();
-                int next = curr + arg;
+                int next = curr + 1;
+                // Java整数过大会溢出而变成负数
+                if (next < 0) {
+                    throw new Error("Maximum permit count exceeded");
+                }
                 if (compareAndSetState(curr, next)) {
+                    holdCount.set(count - 1);
                     return true;
                 }
             }
@@ -98,6 +119,13 @@ public class SimpleUnfairSemaphore {
         // 测试是否立刻关闭
         if (!exec.isTerminated()) {
             Thread.sleep(2000);
+        }
+        try {
+            SEMAPHORE.release();
+        } catch (Error error) {
+            error.printStackTrace();
+            Thread.sleep(10);
+            System.out.println("Trig error correctly!");
         }
         System.out.println("Finish!");
     }
