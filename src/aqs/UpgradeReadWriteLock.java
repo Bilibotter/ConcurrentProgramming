@@ -78,10 +78,6 @@ public class UpgradeReadWriteLock {
         public Condition newCondition() {
             return sync.newCondition();
         }
-
-        public int getStatuss() {
-            return sync.writeState;
-        }
     }
 
     public static class ReadLock implements Lock {
@@ -89,10 +85,6 @@ public class UpgradeReadWriteLock {
 
         public ReadLock(UpgradeReadWriteLock lock) {
             sync = lock.sync;
-        }
-
-        public int getStatusss() {
-            return sync.getStatuss();
         }
 
         @Override
@@ -149,6 +141,7 @@ public class UpgradeReadWriteLock {
                 apparentlyFirstQueuedIsExclusive.setAccessible(true);
             } catch (ClassNotFoundException | NoSuchMethodException ignore){}
         }
+
         @Override
         boolean readerShouldBlock() {
             try {
@@ -194,9 +187,6 @@ public class UpgradeReadWriteLock {
             return writeState;
         }
 
-        public int getStatuss() {
-            return getState();
-        }
 
         abstract boolean readerShouldBlock();
 
