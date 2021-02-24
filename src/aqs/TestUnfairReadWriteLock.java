@@ -9,8 +9,8 @@ import java.util.concurrent.TimeUnit;
  * @Author: YHM
  * @Date: 2021/2/23 18:55
  */
-public class TestDowngradeReadWriteLock {
-    private final static DowngradeReadWriteLock lock = new DowngradeReadWriteLock();
+public class TestUnfairReadWriteLock {
+    private final static DowngradeReadWriteLock lock = new DowngradeReadWriteLock(false);
 
     private final static DowngradeReadWriteLock.ReadLock read = lock.readerLock();
 
@@ -46,6 +46,7 @@ public class TestDowngradeReadWriteLock {
             try {
                 Thread.sleep(2000);
             }catch (InterruptedException ignore) {}
+            System.out.println("Release write lock");
             write.unlock();
         }
     }
@@ -60,6 +61,7 @@ public class TestDowngradeReadWriteLock {
                 while (!read.tryLock(100, TimeUnit.MILLISECONDS)) {
                     System.out.println(Thread.currentThread().getName()+" acquire read lock fail!");
                 };
+                System.out.println(Thread.currentThread().getName()+" acquire read lock success!");
             }
             catch (InterruptedException ignore) {}
             finally {
@@ -79,6 +81,7 @@ public class TestDowngradeReadWriteLock {
                 while (!write.tryLock(100, TimeUnit.MILLISECONDS)) {
                     System.out.println(Thread.currentThread().getName()+" acquire write lock fail!");
                 };
+                System.out.println(Thread.currentThread().getName()+" acquire write lock success!");
             }
             catch (InterruptedException ignore) {}
             finally {
@@ -145,6 +148,7 @@ public class TestDowngradeReadWriteLock {
             }catch (InterruptedException ignore) {}
         }
     }
+
     static class ExceedReader implements Runnable {
         @Override
         public void run() {
@@ -165,10 +169,6 @@ public class TestDowngradeReadWriteLock {
                     break;
                 }
             }
-            // System.out.println(read.getCount());
-            // System.out.println(read.getCount());
-            // System.out.println(read.getTotal());
-            // System.out.println(read.getTotal()>>16);
         }
     }
 
@@ -181,9 +181,11 @@ public class TestDowngradeReadWriteLock {
         // 先持有写锁时，写锁获取是否被阻塞
         Test(ReadWrite.class, ReadWrite2.class);
         assert write.getHoldCount() == 0;
+        // 测试重入写锁多少次会引发错误
         Thread e1 = new Thread(new ExceedWriter());
         e1.start();
         e1.join();
+        // 测试重入读锁多少次会引发错误
         Thread e2 = new Thread(new ExceedReader());
         e2.start();
         e2.join();
