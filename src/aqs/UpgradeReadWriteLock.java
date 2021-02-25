@@ -160,10 +160,10 @@ public class UpgradeReadWriteLock {
 
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 写锁重入的数量
-        private volatile int writeState = 0;
+        private volatile int writeState;
         // 二进制学的太渣了，不想了
-        // 第19位记录写锁。后面和读锁有关
-        private static final int SHIFT = 19;
+        // 第19位记录写锁，低17位记录读锁
+        // private static final int SHIFT = 19;
         // 一个阈值类的，想好先
         private static final int SENTINEL = 1 << 19;
         // 最大容量还可以增加
@@ -179,14 +179,12 @@ public class UpgradeReadWriteLock {
                     return 0;
                 }
             };
-            // 可能没有意义
             writeState = 0;
         }
 
         int getWriteState() {
             return writeState;
         }
-
 
         abstract boolean readerShouldBlock();
 
@@ -210,7 +208,7 @@ public class UpgradeReadWriteLock {
             // 可以获取写锁的情况是当前为独占状态拥有者
             // 或state == 0
             if (isHeldExclusively()) {
-                writeState += 1;
+                writeState ++;
                 // 溢出
                 if (writeState >= WRITE_MAX) {
                     throw new Error("Maximum write lock count exceeded");
@@ -219,9 +217,9 @@ public class UpgradeReadWriteLock {
             }
             int c = getState();
             // sentinel机制并不好，但实现简单
-            if (c == 0 && !writerShouldBlock() && compareAndSetState(c, c +SENTINEL)) {
+            if (c == 0 && !writerShouldBlock() && compareAndSetState(c, SENTINEL)) {
                 setExclusiveOwnerThread(Thread.currentThread());
-                writeState += 1;
+                writeState ++;
                 return true;
             }
             return false;
@@ -232,18 +230,16 @@ public class UpgradeReadWriteLock {
             if (!isHeldExclusively()) {
                 throw new Error("Attempt to unlock write lock, not locked by current thread");
             }
-            if (writeState != 1) {
+            if (writeState == 1) {
+                setExclusiveOwnerThread(null);
+                // happens-before
                 writeState--;
-                return false;
+                // 写锁释放后由state而不是readCount计算读锁
+                setState(getState()-SENTINEL+readCount.get());
+                return true;
             }
-            // 写锁释放为串行
-            // 写锁释放后由state而不是readCount计算读锁
-            setState(getState()+readCount.get());
-            setExclusiveOwnerThread(null);
-            // happens-before
             writeState--;
-            setState(getState()-SENTINEL);
-            return true;
+            return false;
         }
 
         @Override
@@ -251,7 +247,7 @@ public class UpgradeReadWriteLock {
             // 拥有写锁修改读锁状态不会有并发问题
             // 拥有写锁的状态下用ThreadLocal记录读锁数量
             if (isHeldExclusively()) {
-                Integer lockNum = readCount.get();
+                int lockNum = readCount.get();
                 // 据说 == 比 >= 快
                 if (lockNum == READ_MAX){
                     throw new Error("Maximum lock count exceeded");
@@ -286,16 +282,17 @@ public class UpgradeReadWriteLock {
         @Override
         protected boolean tryReleaseShared(int arg) {
             // 成功释放后该线程拥有的写锁数量
-            Integer update = readCount.get() - 1;
+            int update = readCount.get() - 1;
             if (update <= -1) {
                 throw new Error("Attempt to unlock read lock, not locked by current thread");
             }
             if (isHeldExclusively()) {
-                readCount.set(update);
                 if (update == 0) {
                     readCount.remove();
+                    return true;
                 }
-                return update == 0;
+                readCount.set(update);
+                return false;
             }
             int c, next;
             for (;;) {
