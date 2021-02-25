@@ -245,7 +245,7 @@ public class DowngradeReadWriteLock {
         protected int tryAcquireShared(int arg) {
             // 拥有写锁必成功
             if (isHeldExclusively()) {
-                Integer lockNum = readCount.get();
+                int lockNum = readCount.get();
                 // 拥有写锁，则读锁总数 == 当前线程读锁数
                 // 不用根据State正负转化后计算
                 if (lockNum >= READ_MAX){
@@ -273,7 +273,7 @@ public class DowngradeReadWriteLock {
                     throw new Error("Maximum lock count exceeded");
                 }
                 if (compareAndSetState(c, nextc)) {
-                    Integer lockNum = readCount.get();
+                    int lockNum = readCount.get();
                     readCount.set(lockNum + 1);
                     return 1;
                 }
@@ -299,8 +299,8 @@ public class DowngradeReadWriteLock {
 
         @Override
         protected boolean tryReleaseShared(int arg) {
-            Integer lockNum = readCount.get();
-            if (lockNum == null) {
+            int lockNum = readCount.get();
+            if (lockNum == 0) {
                 throw new Error("Unmatched unlock!");
             }
             if (isHeldExclusively()) {
