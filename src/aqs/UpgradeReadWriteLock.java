@@ -160,7 +160,7 @@ public class UpgradeReadWriteLock {
 
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 写锁重入的数量
-        private volatile int writeState;
+        private int writeState;
         // 二进制学的太渣了，不想了
         // 第19位记录写锁，低17位记录读锁
         // private static final int SHIFT = 19;
@@ -210,7 +210,7 @@ public class UpgradeReadWriteLock {
             if (isHeldExclusively()) {
                 writeState ++;
                 // 溢出
-                if (writeState >= WRITE_MAX) {
+                if (writeState == WRITE_MAX) {
                     throw new Error("Maximum write lock count exceeded");
                 }
                 return true;
@@ -232,7 +232,6 @@ public class UpgradeReadWriteLock {
             }
             if (writeState == 1) {
                 setExclusiveOwnerThread(null);
-                // happens-before
                 writeState--;
                 // 写锁释放后由state而不是readCount计算读锁
                 setState(getState()-SENTINEL+readCount.get());
@@ -244,27 +243,28 @@ public class UpgradeReadWriteLock {
 
         @Override
         protected int tryAcquireShared(int arg) {
+            int update = readCount.get() + 1;
             // 拥有写锁修改读锁状态不会有并发问题
             // 拥有写锁的状态下用ThreadLocal记录读锁数量
             if (isHeldExclusively()) {
-                int lockNum = readCount.get();
                 // 据说 == 比 >= 快
-                if (lockNum == READ_MAX){
+                if (update == READ_MAX){
                     throw new Error("Maximum lock count exceeded");
                 }
-                readCount.set(lockNum + 1);
+                readCount.set(update);
                 return 1;
             }
             int c, nextc;
+            boolean noLock = update == 1;
             for (;;) {
                 c = getState();
                 // 写锁已被持有
-                if (c >= SENTINEL) {
+                if (!isHeldExclusively()) {
                     return -1;
                 }
                 // 公平锁：前驱节点不是首节点
                 // 非公平锁:独占节点的前驱节点为首节点
-                if (readerShouldBlock()) {
+                if (noLock && readerShouldBlock()) {
                     return -1;
                 }
                 nextc = c + 1;
@@ -272,8 +272,7 @@ public class UpgradeReadWriteLock {
                     throw new Error("Maximum read lock count exceeded");
                 }
                 if (compareAndSetState(c, nextc)) {
-                    Integer lockNum = readCount.get();
-                    readCount.set(lockNum + 1);
+                    readCount.set(update);
                     return 1;
                 }
             }
@@ -283,7 +282,7 @@ public class UpgradeReadWriteLock {
         protected boolean tryReleaseShared(int arg) {
             // 成功释放后该线程拥有的写锁数量
             int update = readCount.get() - 1;
-            if (update <= -1) {
+            if (update == -1) {
                 throw new Error("Attempt to unlock read lock, not locked by current thread");
             }
             if (isHeldExclusively()) {
