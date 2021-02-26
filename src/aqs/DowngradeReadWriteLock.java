@@ -155,6 +155,13 @@ public class DowngradeReadWriteLock {
         }
     }
 
+    private static class ReadCount extends ThreadLocal<Integer> {
+        @Override
+        protected Integer initialValue() {
+            return 0;
+        }
+    }
+
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 对写锁容量降级以获取更好的性能
         // 同时写锁降级后会程序出错的地方更快触发
@@ -172,12 +179,7 @@ public class DowngradeReadWriteLock {
         private ThreadLocal<Integer> readCount;
 
         Sync() {
-            readCount = new ThreadLocal<Integer>() {
-                @Override
-                protected Integer initialValue() {
-                    return 0;
-                }
-            };
+            readCount = new ReadCount();
         }
 
         int getExclusive(int c) {
@@ -229,7 +231,7 @@ public class DowngradeReadWriteLock {
         @Override
         protected boolean tryRelease(int arg) {
             if (!isHeldExclusively()) {
-                throw new IllegalMonitorStateException();
+                throw new Error("Unmatched unlock!");
             }
             // 自己的二进制学的太菜了
             int update = getState() - 1;
@@ -243,58 +245,40 @@ public class DowngradeReadWriteLock {
 
         @Override
         protected int tryAcquireShared(int arg) {
+            int update = readCount.get() + 1;
             // 拥有写锁必成功
             if (isHeldExclusively()) {
-                int lockNum = readCount.get();
                 // 拥有写锁，则读锁总数 == 当前线程读锁数
                 // 不用根据State正负转化后计算
-                if (lockNum >= READ_MAX){
+                if (update >= READ_MAX){
                     throw new Error("Maximum lock count exceeded");
                 }
-                // 彩蛋
-                assert arg == 1:"(╯‵□′)╯︵┴─┴ Why you have to do so?";
-                readCount.set(lockNum + 1);
+                readCount.set(update);
                 setState(getState() + READ_UNIT);
                 return 1;
             }
             // 公平锁：前驱节点不是首节点
             // 非公平锁:独占节点的前驱节点为首节点
             int c, nextc;
+            boolean noLock = update == 1;
             for (;;) {
                 c = getState();
+                // 已持有读锁不该被阻塞
+                if (noLock && readerShouldBlock()) {
+                    return -1;
+                }
                 if (getExclusive(c) > 0) {
                     return -1;
                 }
-                if (readerShouldBlock()) {
-                    return -1;
-                }
                 nextc = c + READ_UNIT;
-                if (getShared(getState()) >= READ_MAX) {
+                if (nextc >= READ_MAX) {
                     throw new Error("Maximum lock count exceeded");
                 }
                 if (compareAndSetState(c, nextc)) {
-                    int lockNum = readCount.get();
-                    readCount.set(lockNum + 1);
+                    readCount.set(update);
                     return 1;
                 }
             }
-        }
-
-        // 检查并修改该线程拥有的读锁数量
-        protected int setOwnLockNum(int lockNum, int arg) {
-            // 用arg需要检查是否出现负数的情况
-            // 然而源码每次setState都是固定减1...
-            lockNum -= 1;
-            if (lockNum <= 0) {
-                readCount.remove();
-                if (lockNum < 0) {
-                    throw new Error("Unmatched unlock!");
-                }
-            }
-            else {
-                readCount.set(lockNum);
-            }
-            return lockNum;
         }
 
         @Override
@@ -304,7 +288,10 @@ public class DowngradeReadWriteLock {
                 throw new Error("Unmatched unlock!");
             }
             if (isHeldExclusively()) {
-                lockNum = setOwnLockNum(lockNum, 1);
+                if (lockNum == 1) {
+                    readCount.remove();
+                }
+                readCount.set(lockNum-1);
                 setState(getState() - READ_UNIT);
                 return lockNum == 0;
             }
@@ -314,7 +301,10 @@ public class DowngradeReadWriteLock {
                 next = c - READ_UNIT;
                 // 锁降级前面已经处理过了，因此写锁必为0
                 if (compareAndSetState(c, next)) {
-                    setOwnLockNum(lockNum, 1);
+                    if (lockNum == 1) {
+                        readCount.remove();
+                    }
+                    readCount.set(lockNum-1);
                     return next == 0;
                 }
             }
