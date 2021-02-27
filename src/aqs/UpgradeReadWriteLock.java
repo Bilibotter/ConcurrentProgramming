@@ -230,14 +230,14 @@ public class UpgradeReadWriteLock {
             if (!isHeldExclusively()) {
                 throw new Error("Attempt to unlock write lock, not locked by current thread");
             }
-            if (writeState == 1) {
+            writeState--;
+            if (writeState == 0) {
                 setExclusiveOwnerThread(null);
-                writeState--;
+                // setState保证运行顺序
                 // 写锁释放后由state而不是readCount计算读锁
-                setState(getState()-SENTINEL+readCount.get());
+                setState(readCount.get());
                 return true;
             }
-            writeState--;
             return false;
         }
 
@@ -245,9 +245,9 @@ public class UpgradeReadWriteLock {
         protected int tryAcquireShared(int arg) {
             int update = readCount.get() + 1;
             // 拥有写锁修改读锁状态不会有并发问题
-            // 拥有写锁的状态下用ThreadLocal记录读锁数量
+            // 拥有写锁的状态下只用ThreadLocal记录读锁数量
             if (isHeldExclusively()) {
-                // 据说 == 比 >= 快
+                // 串行时比较安全，用==
                 if (update == READ_MAX){
                     throw new Error("Maximum lock count exceeded");
                 }
@@ -259,7 +259,7 @@ public class UpgradeReadWriteLock {
             for (;;) {
                 c = getState();
                 // 写锁已被持有
-                if (!isHeldExclusively()) {
+                if (c >= SENTINEL) {
                     return -1;
                 }
                 // 公平锁：前驱节点不是首节点
@@ -285,7 +285,8 @@ public class UpgradeReadWriteLock {
             if (update == -1) {
                 throw new Error("Attempt to unlock read lock, not locked by current thread");
             }
-            if (isHeldExclusively()) {
+            // 持有读锁且写锁被持有，则当前线程必持有写锁
+            if (getExclusiveOwnerThread() != null) {
                 if (update == 0) {
                     readCount.remove();
                     return true;
