@@ -160,7 +160,8 @@ public class UpgradeReadWriteLock {
 
     abstract static class Sync extends AbstractQueuedSynchronizer {
         // 写锁重入的数量
-        private int writeState;
+        // 对于是否需要volatile保证可见性存疑
+        private volatile int writeState;
         // 二进制学的太渣了，不想了
         // 第19位记录写锁，低17位记录读锁
         // private static final int SHIFT = 19;
