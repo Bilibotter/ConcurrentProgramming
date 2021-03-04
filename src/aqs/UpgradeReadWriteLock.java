@@ -219,7 +219,8 @@ public class UpgradeReadWriteLock {
             // sentinel机制并不好，但实现简单
             if (c == 0 && !writerShouldBlock() && compareAndSetState(c, SENTINEL)) {
                 setExclusiveOwnerThread(Thread.currentThread());
-                writeState ++;
+                // 由于JMM缘故可能存在可见性问题
+                writeState = 1;
                 return true;
             }
             return false;
